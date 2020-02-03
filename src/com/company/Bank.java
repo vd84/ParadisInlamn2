@@ -47,7 +47,7 @@ class Bank {
 		return accounts;
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws InterruptedException {
 		Bank bank = new Bank();
 
 		Account account1 = bank.getAccounts().get(bank.newAccount(100));
@@ -67,24 +67,25 @@ class Bank {
 
 		//TRANSACTION
 		Transaction transaction = new Transaction(bank);
+		Transaction transaction2 = new Transaction(bank);
+
 
 		transaction.add(operation1);
 		transaction.add(operation2);
-		transaction.add(operation3);
-		transaction.add(operation4);
-		transaction.add(operation5);
-		transaction.run();
+		transaction2.add(operation3);
+		transaction2.add(operation4);
+		transaction2.add(operation5);
 
 		System.out.println(account1.getBalance());
 		System.out.println(account2.getBalance());
 
-		
+		Thread thread1 = new Thread(transaction);
+		Thread thread2 = new Thread(transaction2);
 
-
-
-
-
-
+		thread1.start();
+		thread2.start();
+		thread1.join();
+		thread2.join();
 
 
 	}
