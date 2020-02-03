@@ -13,7 +13,7 @@ class Bank {
     // Instance variables.
     private final List<Account> accounts = new ArrayList<Account>();
 
-    final Object lock = new Object();
+    final ReentrantLock lock = new ReentrantLock();
     //ReentrantLock transactionLock = new ReentrantLock();
 
     // Instance methods.
@@ -34,17 +34,20 @@ class Bank {
     void runOperation(Operation operation) {
         Account account = null;
         account = accounts.get(operation.getAccountId());
+
         synchronized (lock) {
-			int balance = account.getBalance();
-			balance = balance + operation.getAmount();
-			account.setBalance(balance);
-		}
+            int balance = account.getBalance();
+            balance = balance + operation.getAmount();
+            account.setBalance(balance);
+        }
     }
 
     void runTransaction(Transaction transaction) {
         List<Operation> currentOperations = transaction.getOperations();
         for (Operation operation : currentOperations) {
-            runOperation(operation);
+            synchronized (lock) {
+                runOperation(operation);
+            }
         }
     }
 
@@ -52,14 +55,15 @@ class Bank {
         return accounts;
     }
 
-/*    private void lockTransactionLock() {
+    private void lockTransactionLock() {
+        lock.lock();
         try {
-            transactionLock.tryLock();
+            lock.tryLock();
         } finally {
-            transactionLock.unlock();
+            lock.unlock();
         }
 
-    }*/
+    }
 
 
     public static void main(String[] args) throws InterruptedException {
@@ -91,8 +95,6 @@ class Bank {
         transaction2.add(operation4);
         transaction2.add(operation5);
 
-        System.out.println(account1.getBalance());
-        System.out.println(account2.getBalance());
 
         Thread thread1 = new Thread(transaction);
         Thread thread2 = new Thread(transaction2);
@@ -101,6 +103,9 @@ class Bank {
         thread2.start();
         thread1.join();
         thread2.join();
+
+        System.out.println(account1.getBalance());
+        System.out.println(account2.getBalance());
 
 
     }
