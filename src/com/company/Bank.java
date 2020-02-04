@@ -61,6 +61,8 @@ class Bank {
 
     private void releaseAllLocks() {
 
+
+
         for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
             accountReentrantLockEntry.getValue().unlock();
 
@@ -80,6 +82,9 @@ class Bank {
                         runOperation(operation);
                     } finally {
                         releaseAllLocks();
+
+                        }
+
                     }
                     break;
                 } else {
