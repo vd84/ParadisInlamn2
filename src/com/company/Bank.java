@@ -38,50 +38,56 @@ class Bank {
         account = accounts.get(operation.getAccountId());
 
 
-        int balance = account.getBalance();
-        balance = balance + operation.getAmount();
-        account.setBalance(balance);
-
-    }
-
-    private boolean allLocksOk() {
-        boolean returnValue = true;
-        for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
-            if (!accountReentrantLockEntry.getValue().tryLock()) {
-                returnValue = false;
+        accountAndLocks.get(accounts.get(operation.getAccountId())).lock();
+            try {
+                int balance = account.getBalance();
+                balance = balance + operation.getAmount();
+                account.setBalance(balance);
+            } finally {
+                accountAndLocks.get(accounts.get(operation.getAccountId())).unlock();
             }
 
 
+    }
+
+    private boolean getAllLocks() {
+        for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
+            if (!accountReentrantLockEntry.getValue().tryLock()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void releaseAllLocks() {
+
+        for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
+            accountReentrantLockEntry.getValue().unlock();
+
         }
 
-        return returnValue;
-
     }
+
 
     void runTransaction(Transaction transaction) {
         Random random = new Random();
         List<Operation> currentOperations = transaction.getOperations();
         for (Operation operation : currentOperations) {
-            for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
 
-                if (allLocksOk()) {
+            for (int i = 0; i < 100; i++) {
+                if (getAllLocks()) {
                     try {
-                        Thread.yield();
-                        System.out.println("Running operation");
                         runOperation(operation);
-                        return;
-
-
                     } finally {
-                        accountReentrantLockEntry.getValue().unlock();
-
-
+                        releaseAllLocks();
                     }
-                }
-                try {
-                    Thread.sleep(random.nextInt(100)); // Random wait before retry.
-                } catch (InterruptedException e) {
-                    System.out.println(e);
+                    break;
+                } else {
+                    try {
+                        Thread.sleep(random.nextInt(100)); // Random wait before retry.
+                    } catch (InterruptedException e) {
+                        System.out.println(e);
+                    }
                 }
             }
 
@@ -108,14 +114,13 @@ class Bank {
         Bank bank = new Bank();
 
         Account account1 = bank.getAccounts().get(bank.newAccount(0));
-        System.out.println(account1.getBalance());
         //OPERATION
 
         long startTime = System.nanoTime();
 
         //parralelize
-        int numThreads = 2;
-        int numTransactions = 2;
+        int numThreads = 4;
+        int numTransactions = 20;
         Transaction[] transactions = new Transaction[numTransactions];
         Thread[] threads = new Thread[numThreads];
 
@@ -125,7 +130,7 @@ class Bank {
             for (int j = 0; j < numTransactions / numThreads; j++) {
                 transactions[i].add(new Operation(bank, account1.getId(), 1));
             }
-            System.out.println("There are " + transactions[i].getOperations().size() + " number of operations to be done");
+            System.out.println("There are " + transactions[i].getOperations().size() + " of operations to be done");
 
             threads[i] = new Thread(transactions[i]);
         }
