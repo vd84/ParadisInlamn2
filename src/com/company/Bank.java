@@ -3,8 +3,7 @@
 package com.company;
 
 import java.math.BigInteger;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.concurrent.locks.ReadWriteLock;
@@ -13,7 +12,8 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 class Bank {
     // Instance variables.
     private final List<Account> accounts = new ArrayList<Account>();
-
+    private List<ReentrantLock> reentrantLocks = new ArrayList<>();
+    HashMap<Account, ReentrantLock> accountAndLocks = new HashMap<>();
     ReentrantReadWriteLock transactionLock = new ReentrantReadWriteLock();
 
     // Instance methods.
@@ -21,7 +21,9 @@ class Bank {
     int newAccount(int balance) {
         int accountId;
         accountId = accounts.size(); // FIX ORIGINAL
-        accounts.add(new Account(accountId, balance));
+        Account accountToAdd = new Account(accountId, balance);
+        accounts.add(accountToAdd);
+        accountAndLocks.put(accountToAdd, new ReentrantLock());
         return accountId;
     }
 
@@ -42,11 +44,47 @@ class Bank {
 
     }
 
+    private boolean allLocksOk() {
+        boolean returnValue = true;
+        for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
+            if (!accountReentrantLockEntry.getValue().tryLock()) {
+                returnValue = false;
+            }
+
+
+        }
+
+        return returnValue;
+
+    }
+
     void runTransaction(Transaction transaction) {
+        Random random = new Random();
         List<Operation> currentOperations = transaction.getOperations();
         for (Operation operation : currentOperations) {
+            for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
 
-            runOperation(operation);
+                if (allLocksOk()) {
+                    try {
+                        Thread.yield();
+                        System.out.println("Running operation");
+                        runOperation(operation);
+                        return;
+
+
+                    } finally {
+                        accountReentrantLockEntry.getValue().unlock();
+
+
+                    }
+                }
+                try {
+                    Thread.sleep(random.nextInt(100)); // Random wait before retry.
+                } catch (InterruptedException e) {
+                    System.out.println(e);
+                }
+            }
+
 
         }
     }
@@ -70,16 +108,14 @@ class Bank {
         Bank bank = new Bank();
 
         Account account1 = bank.getAccounts().get(bank.newAccount(0));
-        Account account2 = bank.getAccounts().get(bank.newAccount(0));
         System.out.println(account1.getBalance());
-        System.out.println(account2.getBalance());
         //OPERATION
 
         long startTime = System.nanoTime();
 
         //parralelize
-        int numThreads = 9;
-        int numTransactions = 1000;
+        int numThreads = 2;
+        int numTransactions = 2;
         Transaction[] transactions = new Transaction[numTransactions];
         Thread[] threads = new Thread[numThreads];
 
@@ -87,8 +123,9 @@ class Bank {
             transactions[i] = new Transaction(bank);
 
             for (int j = 0; j < numTransactions / numThreads; j++) {
-                transactions[i].add(new Operation(bank, account1.getId(), 100));
+                transactions[i].add(new Operation(bank, account1.getId(), 1));
             }
+            System.out.println("There are " + transactions[i].getOperations().size() + " number of operations to be done");
 
             threads[i] = new Thread(transactions[i]);
         }
@@ -102,13 +139,11 @@ class Bank {
 
 
         System.out.println(account1.getBalance());
-        System.out.println(account2.getBalance());
 
         long end = System.nanoTime();
 
 
         System.out.println("It took time: " + (end - startTime) / 1000000000.0);
-
 
     }
 
