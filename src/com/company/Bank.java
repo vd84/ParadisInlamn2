@@ -58,9 +58,9 @@ class Bank {
     private void lockTransactionLock() {
         transactionLock.writeLock();
         try {
-            lock.tryLock();
+            transactionLock.isWriteLocked();
         } finally {
-            lock.unlock();
+            transactionLock.isWriteLocked();
         }
 
     }
