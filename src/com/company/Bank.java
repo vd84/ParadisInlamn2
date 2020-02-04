@@ -2,6 +2,7 @@
 
 package com.company;
 
+import java.math.BigInteger;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Lock;
@@ -13,8 +14,7 @@ class Bank {
     // Instance variables.
     private final List<Account> accounts = new ArrayList<Account>();
 
-    final ReentrantLock lock = new ReentrantLock();
-    //ReentrantLock transactionLock = new ReentrantLock();
+    ReentrantReadWriteLock transactionLock = new ReentrantReadWriteLock();
 
     // Instance methods.
 
@@ -35,19 +35,19 @@ class Bank {
         Account account = null;
         account = accounts.get(operation.getAccountId());
 
-        synchronized (lock) {
-            int balance = account.getBalance();
-            balance = balance + operation.getAmount();
-            account.setBalance(balance);
-        }
+
+        int balance = account.getBalance();
+        balance = balance + operation.getAmount();
+        account.setBalance(balance);
+
     }
 
     void runTransaction(Transaction transaction) {
         List<Operation> currentOperations = transaction.getOperations();
         for (Operation operation : currentOperations) {
-            synchronized (lock) {
-                runOperation(operation);
-            }
+
+            runOperation(operation);
+
         }
     }
 
@@ -56,7 +56,7 @@ class Bank {
     }
 
     private void lockTransactionLock() {
-        lock.lock();
+        transactionLock.writeLock();
         try {
             lock.tryLock();
         } finally {
@@ -69,43 +69,45 @@ class Bank {
     public static void main(String[] args) throws InterruptedException {
         Bank bank = new Bank();
 
-        Account account1 = bank.getAccounts().get(bank.newAccount(100));
+        Account account1 = bank.getAccounts().get(bank.newAccount(0));
         Account account2 = bank.getAccounts().get(bank.newAccount(0));
         System.out.println(account1.getBalance());
         System.out.println(account2.getBalance());
         //OPERATION
-        Operation operation1 = new Operation(bank, account1.getId(), 100);
-        Operation operation2 = new Operation(bank, account1.getId(), -100);
-        Operation operation3 = new Operation(bank, account1.getId(), 100);
-        Operation operation4 = new Operation(bank, account1.getId(), -100);
-        Operation operation5 = new Operation(bank, account1.getId(), 100);
 
-        operation1.run();
-        System.out.println(account1.getBalance());
-        System.out.println(account2.getBalance());
+        long startTime = System.nanoTime();
 
-        //TRANSACTION
-        Transaction transaction = new Transaction(bank);
-        Transaction transaction2 = new Transaction(bank);
+        //parralelize
+        int numThreads = 9;
+        int numTransactions = 1000;
+        Transaction[] transactions = new Transaction[numTransactions];
+        Thread[] threads = new Thread[numThreads];
 
+        for (int i = 0; i < numThreads; i++) {
+            transactions[i] = new Transaction(bank);
 
-        transaction.add(operation1);
-        transaction.add(operation2);
-        transaction2.add(operation3);
-        transaction2.add(operation4);
-        transaction2.add(operation5);
+            for (int j = 0; j < numTransactions / numThreads; j++) {
+                transactions[i].add(new Operation(bank, account1.getId(), 100));
+            }
 
+            threads[i] = new Thread(transactions[i]);
+        }
+        for (int i = 0; i < numThreads; i++) {
+            threads[i].start();
+        }
 
-        Thread thread1 = new Thread(transaction);
-        Thread thread2 = new Thread(transaction2);
+        for (int i = 0; i < numThreads; i++) {
+            threads[i].join();
+        }
 
-        thread1.start();
-        thread2.start();
-        thread1.join();
-        thread2.join();
 
         System.out.println(account1.getBalance());
         System.out.println(account2.getBalance());
+
+        long end = System.nanoTime();
+
+
+        System.out.println("It took time: " + (end - startTime) / 1000000000.0);
 
 
     }
