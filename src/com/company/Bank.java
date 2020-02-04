@@ -12,9 +12,11 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 class Bank {
     // Instance variables.
     private final List<Account> accounts = new ArrayList<Account>();
-    private List<ReentrantLock> reentrantLocks = new ArrayList<>();
-    HashMap<Account, ReentrantLock> accountAndLocks = new HashMap<>();
+    volatile Hashtable<Account, ReentrantLock> accountAndLocks = new Hashtable<>(
+
+    );
     ReentrantReadWriteLock transactionLock = new ReentrantReadWriteLock();
+    Object lock = new Object();
 
     // Instance methods.
 
@@ -37,36 +39,76 @@ class Bank {
         Account account = null;
         account = accounts.get(operation.getAccountId());
 
-
-        accountAndLocks.get(accounts.get(operation.getAccountId())).lock();
-            try {
-                int balance = account.getBalance();
-                balance = balance + operation.getAmount();
-                account.setBalance(balance);
-            } finally {
-                accountAndLocks.get(accounts.get(operation.getAccountId())).unlock();
+        Random random = new Random();
+        for (int i = 0; i < 100; i++) {
+            if (getCurrentLock(account)) {
+                try {
+                    int balance = account.getBalance();
+                    balance = balance + operation.getAmount();
+                    account.setBalance(balance);
+                } finally {
+                    releaseCurrentLock(account);
+                }
+                break;
+            } else {
+                try {
+                    Thread.sleep(random.nextInt(100)); // Random wait before retry.
+                } catch (InterruptedException e) {
+                    System.out.println(e);
+                }
             }
+        }
+
+    }
+
+    private boolean getCurrentLock(Account account) {
+
+        return accountAndLocks.get(account).tryLock();
+    }
+
+    private void releaseCurrentLock(Account account) {
+        accountAndLocks.get(account).unlock();
+    }
+
+    private void releaseCurrentLockOperation(List<Operation> operations) {
+        for (Operation o : operations){
+        if (accountAndLocks.get(accounts.get(o.getAccountId())).isHeldByCurrentThread())
+            accountAndLocks.get(accounts.get(o.getAccountId())).unlock();
+    }
+}
+
+    private boolean getAllLocks(List<Operation> operations) {
+
+        for (Operation o : operations) {
+            if (!accountAndLocks.get(accounts.get(o.getAccountId())).tryLock()) {
+                return false;
+            }
+
+        }
+        return true;
 
 
     }
 
-    private boolean getAllLocks() {
-        for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
-            if (!accountReentrantLockEntry.getValue().tryLock()) {
+    private void releaseAllLocks(List<Operation> operations) {
+
+        for (Operation o : operations) {
+            if (accountAndLocks.get(accounts.get(o.getAccountId())).isHeldByCurrentThread())
+                accountAndLocks.get(accounts.get(o.getAccountId())).unlock();
+
+
+        }
+    }
+
+    private boolean lockOperation(List<Operation> operations) {
+
+
+        for (Operation o : operations) {
+            if (!accountAndLocks.get(accounts.get(o.getAccountId())).tryLock()) {
                 return false;
             }
         }
         return true;
-    }
-
-    private void releaseAllLocks() {
-
-
-
-        for (Map.Entry<Account, ReentrantLock> accountReentrantLockEntry : accountAndLocks.entrySet()) {
-            accountReentrantLockEntry.getValue().unlock();
-
-        }
 
     }
 
@@ -74,30 +116,28 @@ class Bank {
     void runTransaction(Transaction transaction) {
         Random random = new Random();
         List<Operation> currentOperations = transaction.getOperations();
-        for (Operation operation : currentOperations) {
 
+        for (Operation operation : currentOperations) {
             for (int i = 0; i < 100; i++) {
-                if (getAllLocks()) {
+                if (lockOperation(currentOperations)) {
                     try {
                         runOperation(operation);
                     } finally {
-                        releaseAllLocks();
-
-
-
+                        releaseCurrentLockOperation(currentOperations);
                     }
                     break;
                 } else {
-                    try {
-                        Thread.sleep(random.nextInt(100)); // Random wait before retry.
-                    } catch (InterruptedException e) {
-                        System.out.println(e);
-                    }
+                    releaseCurrentLockOperation(currentOperations);
+                }
+                try {
+                    Thread.sleep(random.nextInt(100)); // Random wait before retry.
+                } catch (InterruptedException e) {
+                    System.out.println(e);
                 }
             }
-
-
         }
+
+
     }
 
     public List<Account> getAccounts() {
@@ -124,7 +164,7 @@ class Bank {
         long startTime = System.nanoTime();
 
         //parralelize
-        int numThreads = 4;
+        int numThreads = 20;
         int numTransactions = 20;
         Transaction[] transactions = new Transaction[numTransactions];
         Thread[] threads = new Thread[numThreads];
