@@ -12,7 +12,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 class Bank {
     // Instance variables.
     private final List<Account> accounts = new ArrayList<Account>();
-    volatile Hashtable<Account, ReentrantReadWriteLock> accountAndLocks = new Hashtable<>(
+    volatile Hashtable<Integer, ReentrantReadWriteLock> accountAndLocks = new Hashtable<>(
 
     );
     ReentrantReadWriteLock transactionLock = new ReentrantReadWriteLock();
@@ -25,7 +25,7 @@ class Bank {
         accountId = accounts.size(); // FIX ORIGINAL
         Account accountToAdd = new Account(accountId, balance);
         accounts.add(accountToAdd);
-        accountAndLocks.put(accountToAdd, new ReentrantReadWriteLock());
+        accountAndLocks.put(accountId, new ReentrantReadWriteLock());
         return accountId;
     }
 
@@ -42,13 +42,13 @@ class Bank {
         Random random = new Random();
         for (int i = 0; i < 100; i++) {
 
-            if (getCurrentLock(account)) {
+            if (getCurrentLock(account.getId())) {
                 int balance = account.getBalance();
                 balance = balance + operation.getAmount();
                 try {
                     account.setBalance(balance);
                 } finally {
-                    releaseCurrentLock(account);
+                    releaseCurrentLock(account.getId());
                 }
                 break;
             } else {
@@ -62,33 +62,32 @@ class Bank {
 
     }
 
-    private boolean getCurrentLock(Account account) {
+    private boolean getCurrentLock(int accountId) {
 
-        if (!accountAndLocks.get(account).writeLock().tryLock()) {
+        if (!accountAndLocks.get(accountId).writeLock().tryLock()) {
             return false;
         }
         return true;
     }
 
-    private void releaseCurrentLock(Account account) {
-        accountAndLocks.get(account).writeLock().unlock();
+    private void releaseCurrentLock(int accountId) {
+        accountAndLocks.get(accountId).writeLock().unlock();
     }
 
-    private void releaseCurrentLockOperation(List<Operation> operations) {
-        for (Operation o : operations) {
-            if (accountAndLocks.get(accounts.get(o.getAccountId())).writeLock().isHeldByCurrentThread())
-                accountAndLocks.get(accounts.get(o.getAccountId())).writeLock().unlock();
-        }
+    private void releaseCurrentLockOperation(int accountId) {
+
+        if (accountAndLocks.get(accountId).writeLock().isHeldByCurrentThread())
+            accountAndLocks.get(accountId).writeLock().unlock();
+
     }
 
-    private boolean lockOperation(List<Operation> operations) {
+    private boolean lockOperation(int accountId) {
 
 
-        for (Operation o : operations) {
-            if (!accountAndLocks.get(accounts.get(o.getAccountId())).writeLock().tryLock()) {
-                return false;
-            }
+        if (!accountAndLocks.get(accountId).writeLock().tryLock()) {
+            return false;
         }
+
         return true;
 
     }
@@ -100,15 +99,15 @@ class Bank {
 
         for (Operation operation : currentOperations) {
             for (int i = 0; i < 100; i++) {
-                if (lockOperation(currentOperations)) {
+                if (lockOperation(operation.getAccountId())) {
                     try {
                         runOperation(operation);
                     } finally {
-                        releaseCurrentLockOperation(currentOperations);
+                        releaseCurrentLockOperation(operation.getAccountId());
                     }
                     break;
                 } else {
-                    releaseCurrentLockOperation(currentOperations);
+                    releaseCurrentLockOperation(operation.getAccountId());
                 }
                 try {
                     Thread.sleep(random.nextInt(100)); // Random wait before retry.
@@ -145,8 +144,8 @@ class Bank {
         long startTime = System.nanoTime();
 
         //parralelize
-        int numThreads = 20;
-        int numTransactions = 20;
+        int numThreads = 4;
+        int numTransactions = 20000000;
         Transaction[] transactions = new Transaction[numTransactions];
         Thread[] threads = new Thread[numThreads];
 
@@ -156,7 +155,6 @@ class Bank {
             for (int j = 0; j < numTransactions / numThreads; j++) {
                 transactions[i].add(new Operation(bank, account1.getId(), 1));
             }
-            System.out.println("There are " + transactions[i].getOperations().size() + " of operations to be done");
 
             threads[i] = new Thread(transactions[i]);
         }
@@ -168,8 +166,6 @@ class Bank {
             threads[i].join();
         }
 
-
-        System.out.println(account1.getBalance());
 
         long end = System.nanoTime();
 

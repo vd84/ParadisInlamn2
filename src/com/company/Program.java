@@ -8,9 +8,9 @@ import java.util.concurrent.TimeUnit;
 
 public class Program {
 	// Static variables.
-	private static final int NUM_THREADS = 4;
-	private static final int NUM_ACCOUNTS = 100000;
-	private static final int FACTOR = 100;
+	private static final int NUM_THREADS = 1;
+	private static final int NUM_ACCOUNTS = 80000;
+	private static final int FACTOR = 200;
 	private static final int TIMEOUT = 60; // Seconds;
 	private static final int NUM_TRANSACTIONS = NUM_ACCOUNTS * FACTOR;
 	private static Integer[] accountIds = new Integer[NUM_ACCOUNTS];
