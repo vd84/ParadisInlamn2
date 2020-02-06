@@ -8,9 +8,9 @@ import java.util.concurrent.TimeUnit;
 
 public class Program {
 	// Static variables.
-	private static final int NUM_THREADS = 8;
-	private static final int NUM_ACCOUNTS = 1500;
-	private static final int FACTOR = 10000;
+	private static final int NUM_THREADS = 4;
+	private static final int NUM_ACCOUNTS = 100000;
+	private static final int FACTOR = 100;
 	private static final int TIMEOUT = 60; // Seconds;
 	private static final int NUM_TRANSACTIONS = NUM_ACCOUNTS * FACTOR;
 	private static Integer[] accountIds = new Integer[NUM_ACCOUNTS];
@@ -34,7 +34,7 @@ public class Program {
 		}
 	}
 
-	// You may use this test to test thread-safety for operations.
+/*	// You may use this test to test thread-safety for operations.
 	private static void runTestOperations() {
 		ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
 
@@ -65,7 +65,7 @@ public class Program {
 		catch (Exception exception) {
 			exception.printStackTrace();
 		}
-	}
+	}*/
 
 	// You may use this test to test thread-safety for transactions.
 	private static void runTestTransactions() {
@@ -89,12 +89,14 @@ public class Program {
 
 			System.out.println("Test transactions finished.");
 			System.out.println("Completed: " + completed);
+			double benchmark = time / 1000000;
 			System.out.println("Time [ms]: " + time / 1000000);
 
 			for (int i = 0; i < NUM_ACCOUNTS; i++) {
 				int balance = bank.getAccountBalance(accountIds[i]);
 				System.out.println("Account: " + accountIds[i] + "; Balance: " + balance);
 			}
+			System.out.println(benchmark);
 		}
 		catch (Exception exception) {
 			exception.printStackTrace();
@@ -104,7 +106,7 @@ public class Program {
 	// Entry point.
 	public static void main(String[] args) {
 		initiate();
-		runTestOperations();
+		//runTestOperations();
 		runTestTransactions();
 	}
 }

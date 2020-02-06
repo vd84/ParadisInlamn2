@@ -12,7 +12,7 @@ import java.util.concurrent.locks.ReentrantReadWriteLock;
 class Bank {
     // Instance variables.
     private final List<Account> accounts = new ArrayList<Account>();
-    volatile Hashtable<Account, ReentrantLock> accountAndLocks = new Hashtable<>(
+    volatile Hashtable<Account, ReentrantReadWriteLock> accountAndLocks = new Hashtable<>(
 
     );
     ReentrantReadWriteLock transactionLock = new ReentrantReadWriteLock();
@@ -25,7 +25,7 @@ class Bank {
         accountId = accounts.size(); // FIX ORIGINAL
         Account accountToAdd = new Account(accountId, balance);
         accounts.add(accountToAdd);
-        accountAndLocks.put(accountToAdd, new ReentrantLock());
+        accountAndLocks.put(accountToAdd, new ReentrantReadWriteLock());
         return accountId;
     }
 
@@ -41,10 +41,11 @@ class Bank {
 
         Random random = new Random();
         for (int i = 0; i < 100; i++) {
+
             if (getCurrentLock(account)) {
+                int balance = account.getBalance();
+                balance = balance + operation.getAmount();
                 try {
-                    int balance = account.getBalance();
-                    balance = balance + operation.getAmount();
                     account.setBalance(balance);
                 } finally {
                     releaseCurrentLock(account);
@@ -63,40 +64,20 @@ class Bank {
 
     private boolean getCurrentLock(Account account) {
 
-        return accountAndLocks.get(account).tryLock();
+        if (!accountAndLocks.get(account).writeLock().tryLock()) {
+            return false;
+        }
+        return true;
     }
 
     private void releaseCurrentLock(Account account) {
-        accountAndLocks.get(account).unlock();
+        accountAndLocks.get(account).writeLock().unlock();
     }
 
     private void releaseCurrentLockOperation(List<Operation> operations) {
-        for (Operation o : operations){
-        if (accountAndLocks.get(accounts.get(o.getAccountId())).isHeldByCurrentThread())
-            accountAndLocks.get(accounts.get(o.getAccountId())).unlock();
-    }
-}
-
-    private boolean getAllLocks(List<Operation> operations) {
-
         for (Operation o : operations) {
-            if (!accountAndLocks.get(accounts.get(o.getAccountId())).tryLock()) {
-                return false;
-            }
-
-        }
-        return true;
-
-
-    }
-
-    private void releaseAllLocks(List<Operation> operations) {
-
-        for (Operation o : operations) {
-            if (accountAndLocks.get(accounts.get(o.getAccountId())).isHeldByCurrentThread())
-                accountAndLocks.get(accounts.get(o.getAccountId())).unlock();
-
-
+            if (accountAndLocks.get(accounts.get(o.getAccountId())).writeLock().isHeldByCurrentThread())
+                accountAndLocks.get(accounts.get(o.getAccountId())).writeLock().unlock();
         }
     }
 
@@ -104,7 +85,7 @@ class Bank {
 
 
         for (Operation o : operations) {
-            if (!accountAndLocks.get(accounts.get(o.getAccountId())).tryLock()) {
+            if (!accountAndLocks.get(accounts.get(o.getAccountId())).writeLock().tryLock()) {
                 return false;
             }
         }
