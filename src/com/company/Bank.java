@@ -38,29 +38,13 @@ class Bank {
     void runOperation(Operation operation) {
         Account account = null;
         account = accounts.get(operation.getAccountId());
-
-        Random random = new Random();
-        for (int i = 0; i < 100; i++) {
-
-            if (getCurrentLock(account.getId())) {
-                int balance = account.getBalance();
-                balance = balance + operation.getAmount();
-                try {
-                    account.setBalance(balance);
-                } finally {
-                    releaseCurrentLock(account.getId());
-                }
-                break;
-            } else {
-                try {
-                    Thread.sleep(random.nextInt(100)); // Random wait before retry.
-                } catch (InterruptedException e) {
-                    System.out.println(e);
-                }
-            }
+        synchronized (account) {
+            int balance = account.getBalance();
+            balance = balance + operation.getAmount();
+            account.setBalance(balance);
         }
-
     }
+
 
     private boolean getCurrentLock(int accountId) {
 
@@ -92,6 +76,28 @@ class Bank {
 
     }
 
+    private boolean lockNecessaryAccounts(List<Operation> operations) {
+
+        for (Operation operation : operations) {
+            if (!accountAndLocks.get(operation.getAccountId()).writeLock().tryLock()) {
+                return false;
+            }
+
+        }
+        return true;
+
+    }
+
+    private void releaseNecessaryLocks(List<Operation> operations) {
+
+        for (Operation operation : operations) {
+            if (accountAndLocks.get(operation.getAccountId()).writeLock().isHeldByCurrentThread())
+                accountAndLocks.get(operation.getAccountId()).writeLock().unlock();
+
+
+        }
+    }
+
 
     void runTransaction(Transaction transaction) {
         Random random = new Random();
@@ -99,18 +105,18 @@ class Bank {
 
         for (Operation operation : currentOperations) {
             for (int i = 0; i < 100; i++) {
-                if (lockOperation(operation.getAccountId())) {
+                if (lockNecessaryAccounts(currentOperations)) {
                     try {
                         runOperation(operation);
                     } finally {
-                        releaseCurrentLockOperation(operation.getAccountId());
+                        releaseNecessaryLocks(currentOperations);
                     }
                     break;
                 } else {
-                    releaseCurrentLockOperation(operation.getAccountId());
+                    releaseNecessaryLocks(currentOperations);
                 }
                 try {
-                    Thread.sleep(random.nextInt(100)); // Random wait before retry.
+                    Thread.sleep(random.nextInt(50)); // Random wait before retry.
                 } catch (InterruptedException e) {
                     System.out.println(e);
                 }
@@ -120,22 +126,9 @@ class Bank {
 
     }
 
-    public List<Account> getAccounts() {
-        return accounts;
-    }
-
-    private void lockTransactionLock() {
-        transactionLock.writeLock();
-        try {
-            transactionLock.isWriteLocked();
-        } finally {
-            transactionLock.isWriteLocked();
-        }
-
-    }
-
 
     public static void main(String[] args) throws InterruptedException {
+/*
         Bank bank = new Bank();
 
         Account account1 = bank.getAccounts().get(bank.newAccount(0));
@@ -174,5 +167,7 @@ class Bank {
 
     }
 
+*/
 
+    }
 }

@@ -34,16 +34,14 @@ public class Program {
 		}
 	}
 
-/*	// You may use this test to test thread-safety for operations.
+	// You may use this test to test thread-safety for operations.
 	private static void runTestOperations() {
 		ExecutorService executor = Executors.newFixedThreadPool(NUM_THREADS);
-
 		Operation[] operations = new Operation[NUM_TRANSACTIONS * 2];
 		for (int i = 0; i < NUM_TRANSACTIONS; i++) {
 			operations[i * 2] = withdrawals[i % NUM_ACCOUNTS];
 			operations[(i * 2) + 1] = deposits[(i + 1) % NUM_ACCOUNTS];
 		}
-
 		try {
 			long time = System.nanoTime();
 			for (int i = 0; i < NUM_TRANSACTIONS * 2; i++) {
@@ -52,20 +50,20 @@ public class Program {
 			executor.shutdown();
 			boolean completed = executor.awaitTermination(TIMEOUT, TimeUnit.SECONDS);
 			time = System.nanoTime() - time;
-
 			System.out.println("Test operations finished.");
 			System.out.println("Completed: " + completed);
 			System.out.println("Time [ms]: " + time / 1000000);
-
+			double benchmark = time / 1000000;
 			for (int i = 0; i < NUM_ACCOUNTS; i++) {
 				int balance = bank.getAccountBalance(accountIds[i]);
-				System.out.println("Account: " + accountIds[i] + "; Balance: " + balance);
+				//System.out.println("Account: " + accountIds[i] + "; Balance: " + balance);
 			}
+			System.out.println(benchmark);
 		}
 		catch (Exception exception) {
 			exception.printStackTrace();
 		}
-	}*/
+	}
 
 	// You may use this test to test thread-safety for transactions.
 	private static void runTestTransactions() {
@@ -94,7 +92,7 @@ public class Program {
 
 			for (int i = 0; i < NUM_ACCOUNTS; i++) {
 				int balance = bank.getAccountBalance(accountIds[i]);
-				System.out.println("Account: " + accountIds[i] + "; Balance: " + balance);
+				//System.out.println("Account: " + accountIds[i] + "; Balance: " + balance);
 			}
 			System.out.println(benchmark);
 		}
@@ -106,7 +104,7 @@ public class Program {
 	// Entry point.
 	public static void main(String[] args) {
 		initiate();
-		//runTestOperations();
+		runTestOperations();
 		runTestTransactions();
 	}
 }

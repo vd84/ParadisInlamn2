@@ -30,4 +30,7 @@ class Transaction implements Runnable {
 	public void run() {
 		bank.runTransaction(this);
 	}
+	public void runNonParallell() {
+		bank.runTransaction(this);
+	}
 }	
